@@ -48,10 +48,28 @@ Resources:
         LatestAmiId: !Ref LatestAmiId
         ApiEndpoint: !GetAtt ServerlessStack.Outputs.ApiEndpoint
 
+  ALBStack:
+    Type: AWS::CloudFormation::Stack
+    DependsOn: VPCStack
+    Properties:
+      TemplateURL: !Sub "https://s3.${AWS::Region}.amazonaws.com/${TemplateBucket}/alb.yaml"
+
+  ECSStack:
+    Type: AWS::CloudFormation::Stack
+    DependsOn:
+      - IAMStack
+      - VPCStack
+      - ALBStack
+      - ServerlessStack
+    Properties:
+      TemplateURL: !Sub "https://s3.${AWS::Region}.amazonaws.com/${TemplateBucket}/ecs.yaml"
+      Parameters:
+        ApiEndpoint: !GetAtt ServerlessStack.Outputs.ApiEndpoint
+
 Outputs:
   SalesDashboardURL:
     Description: Sales Dashboard URL
-    Value: !GetAtt EC2Stack.Outputs.SalesDashboardURL
+    Value: !GetAtt ALBStack.Outputs.FrontendALBDNS
 
   ApiEndpoint:
     Description: API Endpoint
