@@ -1,10 +1,10 @@
 AWSTemplateFormatVersion: "2010-09-09"
-Description: CI/CD pipeline for Cloud-Native Sales Dashboard with Node.js Lambda
+Description: CI/CD pipeline for Cloud-Native Sales Dashboard with ECS and Lambda
 
 Parameters:
   GitHubRepo:
     Type: String
-    Description: GitHub repository in the format owner/repo (e.g., yourname/sales-dashboard)
+    Description: GitHub repository in the format owner/repo (e.g., yourname/sales-dashboard-v2)
 
   GitHubBranch:
     Type: String
@@ -71,6 +71,8 @@ Resources:
         - arn:aws:iam::aws:policy/SecretsManagerReadWrite
         - arn:aws:iam::aws:policy/CloudWatchLogsFullAccess
         - arn:aws:iam::aws:policy/AmazonEC2FullAccess
+        - arn:aws:iam::aws:policy/AmazonECS_FullAccess
+        - arn:aws:iam::aws:policy/AmazonEC2ContainerRegistryFullAccess
       Policies:
         - PolicyName: AdditionalAccess
           PolicyDocument:
@@ -97,7 +99,6 @@ Resources:
                   - ssm:GetParameters
                   - ssm:GetParameter
                 Resource: "*"
-
   CodeBuildProject:
     Type: AWS::CodeBuild::Project
     Properties:
@@ -109,15 +110,20 @@ Resources:
         ComputeType: BUILD_GENERAL1_SMALL
         Image: aws/codebuild/standard:7.0
         Type: LINUX_CONTAINER
+        PrivilegedMode: true # Required to build Docker images inside CodeBuild
         EnvironmentVariables:
           - Name: TEMPLATE_BUCKET
             Value: !Ref TemplateBucket
           - Name: LATEST_AMI_ID
             Value: !Ref LatestAmiId
+          - Name: AWS_ACCOUNT_ID
+            Value: !Ref AWS::AccountId
+          - Name: AWS_REGION
+            Value: !Ref AWS::Region
       ServiceRole: !GetAtt CodeBuildRole.Arn
       Artifacts:
         Type: CODEPIPELINE
-      TimeoutInMinutes: 15
+      TimeoutInMinutes: 20
 
   CodePipeline:
     Type: AWS::CodePipeline::Pipeline
@@ -143,11 +149,10 @@ Resources:
                 FullRepositoryId: !Ref GitHubRepo
                 BranchName: !Ref GitHubBranch
                 DetectChanges: true
-              RunOrder: 1
 
         - Name: BuildAndDeploy
           Actions:
-            - Name: SAMBuildAndDeploy
+            - Name: DockerBuildAndDeploy
               ActionTypeId:
                 Category: Build
                 Owner: AWS
@@ -159,7 +164,6 @@ Resources:
                 - Name: BuildOutput
               Configuration:
                 ProjectName: !Ref CodeBuildProject
-              RunOrder: 1
 
 Outputs:
   PipelineName:
