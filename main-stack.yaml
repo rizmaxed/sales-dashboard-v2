@@ -51,7 +51,7 @@ Resources:
 Outputs:
   SalesDashboardURL:
     Description: Sales Dashboard URL
-    Value: !GetAtt ALBStack.Outputs.FrontendALBDNS
+    Value: !GetAtt EC2Stack.Outputs.SalesDashboardURL
 
   ApiEndpoint:
     Description: API Endpoint
