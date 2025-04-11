@@ -3,6 +3,7 @@
 
 <head>
     <title>Sales Dashboard</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
         body {
             font-family: Arial, sans-serif;
@@ -22,6 +23,16 @@
             font-weight: bold;
             max-width: 600px;
             margin: 0 auto 30px auto;
+        }
+
+        #chart-container {
+            width: 90%;
+            max-width: 700px;
+            margin: 30px auto;
+            background-color: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
         }
 
         table {
@@ -68,6 +79,11 @@
         This dashboard shows monthly sales totals powered by a serverless backend and an EC2-based frontend - all
         deployed using Infrastructure as Code with AWS CloudFormation, AWS SAM, and DevOps automation.
     </div>
+
+    <div id="chart-container">
+        <canvas id="salesChart"></canvas>
+    </div>
+
     <table id="sales-table">
         <thead>
             <tr>
@@ -87,15 +103,62 @@
             .then(res => res.json())
             .then(data => {
                 const tbody = document.getElementById('sales-table').querySelector('tbody');
+                const months = [];
+                const totals = [];
+
                 data.forEach(row => {
                     const tr = document.createElement('tr');
                     const td1 = document.createElement('td');
                     const td2 = document.createElement('td');
+
                     td1.textContent = row.month;
                     td2.textContent = row.total_amount.toLocaleString();
+
                     tr.appendChild(td1);
                     tr.appendChild(td2);
                     tbody.appendChild(tr);
+
+                    // For chart
+                    months.push(row.month);
+                    totals.push(row.total_amount);
+                });
+
+                // Create chart
+                const ctx = document.getElementById('salesChart').getContext('2d');
+                new Chart(ctx, {
+                    type: 'line',
+                    data: {
+                        labels: months.reverse(),
+                        datasets: [{
+                            label: 'Monthly Sales ($)',
+                            data: totals.reverse(),
+                            borderColor: '#007bff',
+                            backgroundColor: 'rgba(0, 123, 255, 0.1)',
+                            borderWidth: 2,
+                            fill: true,
+                            tension: 0.3,
+                            pointRadius: 4,
+                            pointBackgroundColor: '#007bff',
+                            pointBorderColor: '#fff',
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        plugins: {
+                            legend: {
+                                display: true,
+                                position: 'top'
+                            }
+                        },
+                        scales: {
+                            y: {
+                                beginAtZero: true,
+                                ticks: {
+                                    callback: value => '$' + value.toLocaleString()
+                                }
+                            }
+                        }
+                    }
                 });
             })
             .catch(error => {
