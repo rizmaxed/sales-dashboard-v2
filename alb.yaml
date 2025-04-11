@@ -1,0 +1,50 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: Application Load Balancer for Sales Dashboard ECS Frontend
+
+Resources:
+  FrontendALB:
+    Type: AWS::ElasticLoadBalancingV2::LoadBalancer
+    Properties:
+      Name: sales-dashboard-alb
+      Scheme: internet-facing
+      Subnets:
+        - !ImportValue lab-public-subnet-1
+        - !ImportValue lab-public-subnet-2
+      SecurityGroups:
+        - !ImportValue lab-sg-public
+
+  FrontendTargetGroup:
+    Type: AWS::ElasticLoadBalancingV2::TargetGroup
+    Properties:
+      Name: frontend-target-group
+      Port: 80
+      Protocol: HTTP
+      TargetType: ip
+      VpcId: !ImportValue lab-vpc
+      HealthCheckPath: /
+      HealthCheckIntervalSeconds: 30
+      HealthyThresholdCount: 2
+      UnhealthyThresholdCount: 5
+
+  FrontendListener:
+    Type: AWS::ElasticLoadBalancingV2::Listener
+    Properties:
+      LoadBalancerArn: !Ref FrontendALB
+      Port: 80
+      Protocol: HTTP
+      DefaultActions:
+        - Type: forward
+          TargetGroupArn: !Ref FrontendTargetGroup
+
+Outputs:
+  FrontendALBDNS:
+    Description: Public URL of the ALB
+    Value: !GetAtt FrontendALB.DNSName
+    Export:
+      Name: lab-frontend-alb-url
+
+  FrontendTargetGroupArn:
+    Description: ARN of target group for ECS service
+    Value: !Ref FrontendTargetGroup
+    Export:
+      Name: lab-frontend-target-group
