@@ -1,0 +1,53 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Transform: AWS::Serverless-2016-10-31
+Description: Lambda and API Gateway for serving sales data (using AWS SAM)
+
+Resources:
+  SalesApiGateway:
+    Type: AWS::Serverless::Api
+    Properties:
+      Name: sales-api
+      StageName: Prod
+      Cors:
+        AllowMethods: "'GET'"
+        AllowOrigin: "'*'"
+
+  SalesDataFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: sales-data-backend
+      Runtime: nodejs22.x
+      CodeUri: lambda/
+      Handler: index.handler
+      Timeout: 30
+      Role:
+        Fn::ImportValue: lab-lambda-exec-role
+      Environment:
+        Variables:
+          DB_SECRET_ARN:
+            Fn::ImportValue: lab-db-secret-arn
+          DB_HOST:
+            Fn::ImportValue: lab-db-endpoint
+          DB_PORT:
+            Fn::ImportValue: lab-db-port
+          DB_NAME:
+            Fn::ImportValue: lab-db-name
+      VpcConfig:
+        SecurityGroupIds:
+          - Fn::ImportValue: lab-lambda-sg
+        SubnetIds:
+          - Fn::ImportValue: lab-private-subnet-1
+          - Fn::ImportValue: lab-private-subnet-2
+      Events:
+        SalesApi:
+          Type: Api
+          Properties:
+            RestApiId: !Ref SalesApiGateway
+            Path: /data
+            Method: get
+
+Outputs:
+  ApiEndpoint:
+    Description: Invoke URL for API Gateway
+    Value:
+      Fn::Sub: https://${SalesApiGateway}.execute-api.${AWS::Region}.amazonaws.com/Prod

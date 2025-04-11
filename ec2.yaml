@@ -1,0 +1,46 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: EC2 instance to host the frontend sales dashboard
+
+Parameters:
+  LatestAmiId:
+    Type: String
+    Description: AMI ID to launch the EC2 instance
+
+  ApiEndpoint:
+    Type: String
+    Description: API Gateway base endpoint
+Resources:
+  LabInstance:
+    Type: AWS::EC2::Instance
+    Properties:
+      InstanceType: t2.micro
+      ImageId: !Ref LatestAmiId
+      IamInstanceProfile:
+        Fn::ImportValue: lab-ec2-instance-profile
+      SubnetId:
+        Fn::ImportValue: lab-public-subnet-1
+      SecurityGroupIds:
+        - Fn::ImportValue: lab-sg-public
+      Tags:
+        - Key: Name
+          Value: lab-ec2-instance
+      UserData:
+        Fn::Base64: !Sub |
+          #!/bin/bash
+          dnf update -y
+          dnf install -y nginx
+          dnf install -y postgresql15
+
+          mkdir -p /usr/share/nginx/html
+          mkdir -p /tmp/data
+          curl "https://nfclabs-members.s3.us-east-1.amazonaws.com/lab-12-4/rds-data.sql" -o "/tmp/data/rds-data.sql"
+
+          systemctl enable --now nginx
+          systemctl start --now nginx
+Outputs:
+  SalesDashboardURL:
+    Description: Sales Dashboard URL
+    Value:
+      Fn::Sub:
+        - http://${Dns}
+        - Dns: !GetAtt LabInstance.PublicDnsName

@@ -1,0 +1,58 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: Main parent stack for Cloud-Native Sales Dashboard (ECS Fargate Version)
+
+Parameters:
+  TemplateBucket:
+    Type: String
+    Description: S3 bucket where templates are stored
+
+  LatestAmiId:
+    Type: AWS::SSM::Parameter::Value<AWS::EC2::Image::Id>
+    Default: "/aws/service/ami-amazon-linux-latest/al2023-ami-kernel-6.1-x86_64"
+
+Resources:
+  VPCStack:
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL: !Sub "https://s3.${AWS::Region}.amazonaws.com/${TemplateBucket}/vpc.yaml"
+
+  IAMStack:
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL: !Sub "https://s3.${AWS::Region}.amazonaws.com/${TemplateBucket}/iam.yaml"
+
+  RDSStack:
+    Type: AWS::CloudFormation::Stack
+    DependsOn: VPCStack
+    Properties:
+      TemplateURL: !Sub "https://s3.${AWS::Region}.amazonaws.com/${TemplateBucket}/rds.yaml"
+
+  ServerlessStack:
+    Type: AWS::CloudFormation::Stack
+    DependsOn:
+      - VPCStack
+      - IAMStack
+      - RDSStack
+    Properties:
+      TemplateURL: !Sub "https://s3.${AWS::Region}.amazonaws.com/${TemplateBucket}/serverless-packaged.yaml"
+
+  EC2Stack:
+    Type: AWS::CloudFormation::Stack
+    DependsOn:
+      - VPCStack
+      - IAMStack
+      - ServerlessStack
+    Properties:
+      TemplateURL: !Sub "https://s3.${AWS::Region}.amazonaws.com/${TemplateBucket}/ec2.yaml"
+      Parameters:
+        LatestAmiId: !Ref LatestAmiId
+        ApiEndpoint: !GetAtt ServerlessStack.Outputs.ApiEndpoint
+
+Outputs:
+  SalesDashboardURL:
+    Description: Sales Dashboard URL
+    Value: !GetAtt ALBStack.Outputs.FrontendALBDNS
+
+  ApiEndpoint:
+    Description: API Endpoint
+    Value: !GetAtt ServerlessStack.Outputs.ApiEndpoint

@@ -1,0 +1,70 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: RDS PostgreSQL database with credentials stored in Secrets Manager
+
+Parameters:
+  DBUsername:
+    Type: String
+    Default: postgres
+    Description: Database Username
+
+  DBName:
+    Type: String
+    Default: salesdb
+    Description: Database Name
+
+Resources:
+  DBSubnetGroup:
+    Type: AWS::RDS::DBSubnetGroup
+    Properties:
+      DBSubnetGroupDescription: DB subnet group for private subnets
+      SubnetIds:
+        - Fn::ImportValue: lab-private-subnet-1
+        - Fn::ImportValue: lab-private-subnet-2
+      DBSubnetGroupName: lab-db-subnet-group
+
+  SalesDBInstance:
+    Type: AWS::RDS::DBInstance
+    Properties:
+      DBName: !Ref DBName
+      AllocatedStorage: 20
+      DBInstanceClass: db.t4g.micro
+      Engine: postgres
+      MasterUsername: !Ref DBUsername
+      ManageMasterUserPassword: true
+      VPCSecurityGroups:
+        - Fn::ImportValue: lab-rds-sg
+      DBSubnetGroupName: !Ref DBSubnetGroup
+      PubliclyAccessible: false
+      BackupRetentionPeriod: 0
+      DeletionProtection: false
+      MultiAZ: false
+      StorageType: gp2
+      StorageEncrypted: false
+      Tags:
+        - Key: Name
+          Value: lab-sales-db
+
+Outputs:
+  DBSecretArn:
+    Description: ARN of the Secrets Manager secret created by RDS
+    Value: !GetAtt SalesDBInstance.MasterUserSecret.SecretArn
+    Export:
+      Name: lab-db-secret-arn
+
+  DBEndpoint:
+    Description: RDS endpoint
+    Value: !GetAtt SalesDBInstance.Endpoint.Address
+    Export:
+      Name: lab-db-endpoint
+
+  DBPort:
+    Description: RDS port
+    Value: !GetAtt SalesDBInstance.Endpoint.Port
+    Export:
+      Name: lab-db-port
+
+  DBName:
+    Description: RDS database name
+    Value: !Ref DBName
+    Export:
+      Name: lab-db-name

@@ -1,0 +1,67 @@
+version: "0.2"
+
+phases:
+  install:
+    runtime-versions:
+      nodejs: 22
+    commands:
+      - aws --version
+      - npm install --prefix lambda
+
+  build:
+    commands:
+      - echo Packaging SAM template
+      - mkdir -p dist
+      - |
+        aws cloudformation package \
+          --template-file serverless.yaml \
+          --s3-bucket $TEMPLATE_BUCKET \
+          --output-template-file dist/serverless-packaged.yaml
+
+      - echo Uploading packaged SAM template
+      - aws s3 cp dist/serverless-packaged.yaml s3://$TEMPLATE_BUCKET/
+
+      - echo Uploading remaining CFN templates
+      - aws s3 cp main-stack.yaml s3://$TEMPLATE_BUCKET/
+      - aws s3 cp vpc.yaml s3://$TEMPLATE_BUCKET/
+      - aws s3 cp iam.yaml s3://$TEMPLATE_BUCKET/
+      - aws s3 cp rds.yaml s3://$TEMPLATE_BUCKET/
+      - aws s3 cp ec2.yaml s3://$TEMPLATE_BUCKET/
+
+  post_build:
+    commands:
+      - echo Deploying main CloudFormation stack
+      - |
+        aws cloudformation deploy \
+          --stack-name lab-sales-dashboard \
+          --template-file main-stack.yaml \
+          --capabilities CAPABILITY_NAMED_IAM CAPABILITY_AUTO_EXPAND \
+          --parameter-overrides \
+            TemplateBucket=$TEMPLATE_BUCKET \
+            LatestAmiId=$LATEST_AMI_ID
+
+      - echo Extracting API Gateway endpoint
+      - |
+        API_ENDPOINT=$(aws cloudformation describe-stacks \
+          --stack-name lab-sales-dashboard \
+          --query "Stacks[0].Outputs[?OutputKey=='ApiEndpoint'].OutputValue" \
+          --output text)
+
+      - echo Locating EC2 instance ID
+      - |
+        EC2_INSTANCE_ID=$(aws ec2 describe-instances \
+          --filters "Name=tag:Name,Values=lab-ec2-instance" "Name=instance-state-name,Values=running" \
+          --query "Reservations[0].Instances[0].InstanceId" \
+          --output text)
+
+      - echo Replacing {{API_ENDPOINT}} in index.html
+      - sed "s|{{API_ENDPOINT}}|$API_ENDPOINT|g" public/index.html > index-final.html
+
+      - echo Sending updated index.html to EC2 via SSM
+      - |
+        aws ssm send-command \
+          --document-name "AWS-RunShellScript" \
+          --instance-ids "$EC2_INSTANCE_ID" \
+          --comment "Update index.html on EC2" \
+          --parameters 'commands=["cat <<EOF > /usr/share/nginx/html/index.html","'"$(cat index-final.html | sed 's/"/\\"/g')"'","EOF"]' \
+          --output text
