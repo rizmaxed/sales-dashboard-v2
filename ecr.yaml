@@ -1,0 +1,20 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: Creates an ECR repository for Sales Dashboard frontend
+
+Resources:
+  FrontendECRRepository:
+    Type: AWS::ECR::Repository
+    Properties:
+      RepositoryName: sales-dashboard-frontend
+      ImageScanningConfiguration:
+        scanOnPush: true
+      Tags:
+        - Key: Name
+          Value: sales-dashboard-frontend
+
+Outputs:
+  FrontendRepositoryUri:
+    Description: URI of the ECR repository
+    Value: !GetAtt FrontendECRRepository.RepositoryUri
+    Export:
+      Name: lab-ecr-frontend-uri
