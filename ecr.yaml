@@ -7,7 +7,7 @@ Resources:
     Properties:
       RepositoryName: sales-dashboard-frontend
       ImageScanningConfiguration:
-        scanOnPush: true
+        ScanOnPush: true
       Tags:
         - Key: Name
           Value: sales-dashboard-frontend
