@@ -1,0 +1,78 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: ECS Fargate service for Sales Dashboard frontend
+
+Parameters:
+  ApiEndpoint:
+    Type: String
+    Description: API Gateway endpoint to pass to the container
+
+Resources:
+  FrontendCluster:
+    Type: AWS::ECS::Cluster
+    Properties:
+      ClusterName: sales-dashboard-cluster
+
+  FrontendLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: /ecs/sales-dashboard-frontend
+      RetentionInDays: 1
+
+  FrontendTaskDefinition:
+    Type: AWS::ECS::TaskDefinition
+    Properties:
+      Family: sales-dashboard-frontend-task
+      Cpu: 256
+      Memory: 512
+      NetworkMode: awsvpc
+      RequiresCompatibilities:
+        - FARGATE
+      ExecutionRoleArn: !ImportValue lab-ecs-task-execution-role
+      ContainerDefinitions:
+        - Name: frontend
+          Image: !Join
+            - ":"
+            - - !ImportValue lab-ecr-frontend-uri
+              - "latest"
+          PortMappings:
+            - ContainerPort: 80
+          Environment:
+            - Name: API_ENDPOINT
+              Value: !Ref ApiEndpoint
+          LogConfiguration:
+            LogDriver: awslogs
+            Options:
+              awslogs-group: !Ref FrontendLogGroup
+              awslogs-region: !Ref AWS::Region
+              awslogs-stream-prefix: frontend
+
+  FrontendService:
+    Type: AWS::ECS::Service
+    DependsOn: FrontendTaskDefinition
+    Properties:
+      ServiceName: sales-dashboard-frontend-svc
+      Cluster: !Ref FrontendCluster
+      LaunchType: FARGATE
+      DesiredCount: 2
+      TaskDefinition: !Ref FrontendTaskDefinition
+      NetworkConfiguration:
+        AwsvpcConfiguration:
+          AssignPublicIp: ENABLED
+          Subnets:
+            - !ImportValue lab-public-subnet-1
+            - !ImportValue lab-public-subnet-2
+          SecurityGroups:
+            - !ImportValue lab-sg-public
+      LoadBalancers:
+        - ContainerName: frontend
+          ContainerPort: 80
+          TargetGroupArn: !ImportValue lab-frontend-target-group
+
+Outputs:
+  ECSServiceName:
+    Description: ECS Service name
+    Value: !Ref FrontendService
+
+  ClusterName:
+    Description: ECS Cluster name
+    Value: !Ref FrontendCluster
