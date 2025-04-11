@@ -1,4 +1,4 @@
-FROM nginx:stable
+FROM public.ecr.aws/nginx/nginx:stable
 
 # Set working directory
 WORKDIR /
